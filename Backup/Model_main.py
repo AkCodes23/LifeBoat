@@ -38,7 +38,7 @@ X = data[['Heart Rate', 'Body Temperature', 'Oxygen Saturation', 'Systolic Blood
 y = data['Risk Category']
 
 # Train-test split (70%-30%)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 # Standardize the features
 scaler = StandardScaler()
@@ -115,4 +115,4 @@ def test_model(input_values):
     print(f"Predicted Risk Category: {risk_category}")
 
 # Example: Test the model with new input values
-test_model([85, 36.5, 98, 120, 80, 45, 1, 70, 1.75, 40, 22.9, 95])
+test_model([100, 38.5, 92, 150, 95, 65, 1, 85, 1.70, 55, 30, 105])
