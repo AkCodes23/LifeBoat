@@ -1,0 +1,34 @@
+#include <stdint.h>
+#include <stdbool.h>
+#include <math.h>
+#include <stdio.h>
+#include <unistd.h> // for delay function
+
+#define MLX90614_ADDRESS 0x5A // I2C address of the MLX90614 sensor
+
+void i2c_read(uint8_t address, uint8_t registerAddress, uint8_t* data, uint8_t length) {
+    // Implement I2C read function according to your platform
+    // For example, using WiringPi library on Raspberry Pi:
+    // wiringPiI2CReadReg16(address, registerAddress, data, length);
+}
+
+float readTemperature() {
+    uint16_t temperatureData;
+    i2c_read(MLX90614_ADDRESS, 0x07, (uint8_t*)&temperatureData, 2);
+
+    // Convert temperature data to Celsius
+    float temperature = (temperatureData * 0.02) - 273.15;
+
+    return temperature;
+}
+
+int main() {
+    while (1) {
+        float temperature = readTemperature();
+
+        printf("Body Temperature: %f°C\n", temperature);
+        usleep(1000000); // 1 second delay
+    }
+
+    return 0;
+}

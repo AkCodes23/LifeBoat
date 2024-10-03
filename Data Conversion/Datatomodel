@@ -1,0 +1,200 @@
+#include "stm32f4xx_hal.h"
+#include "MAX30100.h"
+#include "MLX90614.h"
+#include "nanoedge_ai.h"
+#include "knowledge.h"
+
+// Define the I2C handle
+I2C_HandleTypeDef hi2c1;
+
+// Define the MAX30100 handle
+MAX30100 max30100;
+
+// Define the MLX90614 handle
+MLX90614 mlx90614;
+
+// Define the AI model handle
+neai_handle_t ai_handle;
+
+// Define the input and output buffers for the AI model
+#define INPUT_BUFFER_SIZE 6
+#define OUTPUT_BUFFER_SIZE 1
+uint8_t input_buffer[INPUT_BUFFER_SIZE];
+uint8_t output_buffer[OUTPUT_BUFFER_SIZE];
+
+// Define the delay function
+void delay(uint32_t ms) {
+  HAL_Delay(ms);
+}
+
+// Initialize the I2C interface
+void I2C_Init(void) {
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.ClockSpeed = 400000;
+  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  HAL_I2C_Init(&hi2c1);
+}
+
+// Initialize the MAX30100 sensor
+void MAX30100_Init(void) {
+  max30100.begin();
+}
+
+// Read raw values from the MAX30100 sensor
+void MAX30100_Read(uint16_t* ir, uint16_t* red) {
+  max30100.getRawValues(ir, red);
+}
+
+// Initialize the MLX90614 sensor
+void MLX90614_Init(void) {
+  mlx90614.begin();
+}
+
+// Read temperature values from the MLX90614 sensor
+float MLX90614_Read(void) {
+  return mlx90614.readObjectTempC();
+}
+
+// Initialize the AI model
+void AI_Init(void) {
+  // Load the AI model from the library
+  neai_error_t error = neai_load_library("libneai.a", &ai_handle);
+  if (error != NEAI_OK) {
+    // Handle the error
+  }
+}
+
+// Send data to the AI model
+void Send_Data_to_AI_Model(void) {
+  // Read data from the MAX30100 sensor
+  uint16_t ir, red;
+  MAX30100_Read(&ir, &red);
+  
+  // Read data from the MLX90614 sensor
+  float temp = MLX90614_Read();
+  
+  // Prepare the input data for the AI model
+  // Assuming the input format is: ir, red, temp
+  input_buffer[0] = (uint8_t)(ir >> 8);
+  input_buffer[1] = (uint8_t)(ir & 0xFF);
+  input_buffer[2] = (uint8_t)(red >> 8);
+  input_buffer[3] = (uint8_t)(red & 0xFF);
+  input_buffer[4] = (uint8_t)(temp >> 8);
+  input_buffer[5] = (uint8_t)(temp & 0xFF);
+  
+  // Run the inference on the AI model
+  neai_error_t error = neai_run_inference(ai_handle, input_buffer, INPUT_BUFFER_SIZE, output_buffer, OUTPUT_BUFFER_SIZE);
+  if (error != NEAI_OK) {
+    // Handle the error
+  }
+  
+  // Get the prediction from the AI model
+  uint8_t prediction = output_buffer[0];
+  
+  // Print the prediction
+  printf("AI Model Prediction: %d\n", prediction);
+  
+  // Determine the risk level based on the prediction
+  if (prediction == 0) {
+    // Low risk
+    printf("Risk Level: Low\n");
+  } else {
+    // High risk
+    printf("Risk Level: High\n");
+  }
+  
+  // Print the sensor data
+  printf("IR Value: %d\n", ir);
+  printf("Red Value: %d\n", red);
+  printf("Temperature: %f\n", temp);
+  
+  // Calculate heart rate and oxygen saturation
+  uint16_t irBuffer[100];
+  for (int i = 0; i < 100; i++) {
+    MAX30100_Read(&ir, &red);
+    irBuffer[i] = ir;
+  }
+  float hr;
+  calculateHR(irBuffer, 100, &hr);
+  printf("Heart Rate: %f bpm\n", hr);
+  
+  float spo2;
+  calculateSpO2(ir, red, &spo2);
+  printf("Oxygen Saturation: %f %%\n", spo2);
+  
+  // Read body temperature
+  float bodyTemp = readTemperature();
+  printf("Body Temperature: %f°C\n", bodyTemp);
+}
+
+void calculateHR(uint16_t irData[], int numSamples, float* hr) {
+  // Filter the raw data (e.g., using a moving average filter)
+  int filteredData[numSamples];
+  for (int i = 0; i < numSamples; i++) {
+    filteredData[i] = (irData[i] + irData[(i + 1) % numSamples] + irData[(i + 2) % numSamples]) / 3;
+  }
+
+  // Calculate peak-to-peak amplitude of the IR signal
+  int peakToPeak = 0;
+  for (int i = 1; i < numSamples; i++) {
+    int diff = filteredData[i] - filteredData[i-1];
+    if (diff > peakToPeak) {
+      peakToPeak = diff;
+    }
+  }
+
+  // Calculate time period between peaks (RR interval)
+  int rrInterval = 0;
+  for (int i = 1; i < numSamples; i++) {
+    if (filteredData[i] > peakToPeak / 2 && filteredData[i-1] <= peakToPeak / 2) {
+      rrInterval = i - (i - 100 / 60); // Convert to seconds
+      break;
+    }
+  }
+
+  // Calculate HR from RR interval
+  *hr = 60 / (float)rrInterval;
+}
+
+void calculateSpO2(uint16_t irData, uint16_t redData, float* spo2) {
+  // Calculate ratio of Red to IR absorbance values (R)
+  float R = (float)redData / irData;
+
+  // Calculate SpO2 from R value using a calibration curve or lookup table
+  // For example, using a simple linear calibration curve:
+  *spo2 = 110 - 25 * R;
+}
+
+float readTemperature() {
+  uint16_t temperatureData;
+  i2c_read(MLX90614_ADDRESS, 0x07, (uint8_t*)&temperatureData, 2);
+
+  // Convert temperature data to Celsius
+  float temperature = (temperatureData * 0.02) - 273.15;
+
+  return temperature;
+}
+
+int main(void) {
+  // Initialize the I2C interface
+  I2C_Init();
+  
+  // Initialize the MAX30100 sensor
+  MAX30100_Init();
+  
+  // Initialize the MLX90614 sensor
+  MLX90614_Init();
+  
+  // Initialize the AI model
+  AI_Init();
+  
+  while (1) {
+    // Send data to the AI model
+    Send_Data_to_AI_Model();
+    
+    // Wait for the next iteration
+    delay(100); // adjust the delay as needed
+  }
+  
+  return 0;
+}
