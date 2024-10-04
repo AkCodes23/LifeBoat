@@ -1,0 +1,37 @@
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WiFiServer.h>
+
+ // Define the Wi-Fi credentials
+const char* ssid = "S8";
+const char* password = "12345678";
+
+// Define the serial communication protocol
+#define SERIAL_BAUDRATE 115200
+
+// Define the input data
+int heartRate = 80;
+int spo2 = 95;
+float bodyTemperature = 36.5;
+
+void setup() {
+  // Initialize the serial communication protocol
+  Serial.begin(SERIAL_BAUDRATE);
+
+  // Connect to Wi-Fi
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("Connecting to WiFi...");
+  }
+
+  Serial.println("Connected to WiFi");
+}
+
+void loop() {
+  // Send data to STM32 F411CEU6
+  String data = "Heart Rate: " + String(heartRate) + " SpO2: " + String(spo2) + " Body Temperature: " + String(bodyTemperature);
+  Serial.println(data);
+
+  delay(1000);
+}

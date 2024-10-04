@@ -1,0 +1,67 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// Include the NanoEdge AI library
+#include "nanoedgeai.h"
+#include "knowledge.h"
+
+// Define the serial communication protocol
+#define SERIAL_BAUDRATE 115200
+
+// Define the input and output arrays
+float input[7];
+float output[1];
+
+void setup() {
+  // Initialize the serial communication protocol
+  Serial.begin(SERIAL_BAUDRATE);
+}
+
+void loop() {
+  // Receive data from ESP8266
+  if (Serial.available() > 0) {
+    String data = Serial.readStringUntil('\n');
+    parseData(data);
+  }
+
+  // Use the NanoEdge AI model to make predictions
+  makePrediction();
+}
+
+void parseData(String data) {
+  // Parse the data and store it in the input array
+  int heartRate, spo2;
+  float bodyTemperature;
+  int age, gender, bmi, bp;
+
+  // Assuming the data is in the format: "Heart Rate: X SpO2: Y Body Temperature: Z Age: W Gender: V BMI: U BP: T"
+  sscanf(data.c_str(), "Heart Rate: %d SpO2: %d Body Temperature: %f Age: %d Gender: %d BMI: %d BP: %d", &heartRate, &spo2, &bodyTemperature, &age, &gender, &bmi, &bp);
+
+  input[0] = heartRate;
+  input[1] = spo2;
+  input[2] = bodyTemperature;
+  input[3] = age;
+  input[4] = gender;
+  input[5] = bmi;
+  input[6] = bp;
+}
+
+void makePrediction() {
+  // Use the NanoEdge AI model to make predictions
+  nanoedge_ai_ctx_t ctx;
+  nanoedge_ai_init(&ctx, knowledge, libneai);
+
+  // Set the input data for the model
+  nanoedge_ai_set_input(&ctx, input, 7);
+
+  // Run the model
+  nanoedge_ai_run(&ctx);
+
+  // Get the output from the model
+  nanoedge_ai_get_output(&ctx, output, 1);
+
+  // Print the prediction result
+  Serial.print("Prediction: ");
+  Serial.println(output[0]);
+}
